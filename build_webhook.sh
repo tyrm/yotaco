@@ -7,4 +7,4 @@ zip -r ../lambda-webhook.zip *
 cd ..
 
 # Put it in AWS
-aws lambda update-function-code --function-name api-test-2 --zip-file fileb://lambda-webhook.zip
+aws lambda update-function-code --function-name yotaco-webhook --zip-file fileb://lambda-webhook.zip
