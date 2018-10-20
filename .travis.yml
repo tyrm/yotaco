@@ -1,0 +1,12 @@
+language: python
+python:
+  - "2.7"
+
+env:
+  - SLACK_VERIF_TOKEN=1234567890abcdef12345678
+
+install:
+  - pip install -r webhook/requirements.txt
+
+script:
+  - python -m unittest discover webhook "*_test.py"
