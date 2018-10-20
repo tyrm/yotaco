@@ -17,6 +17,13 @@ def respond(err, res=None):
         },
     }
 
+
+def slack_url_verification(body):
+    return respond(None, {
+        'challenge': body['challenge']
+    })
+
+
 def lambda_handler(event, context):
     # Get POST body
     try:
@@ -28,6 +35,10 @@ def lambda_handler(event, context):
     if body['token'] != os.environ['SLACK_VERIF_TOKEN']:
         return respond(Exception('Invalid Token'))
 
-    print("Got event: " + json.dumps(body, indent=2))
+    # Route Body
+    print("Got body: " + json.dumps(body, indent=2))
 
-    return respond(None, event)
+    if body['type'] == 'url_verification':
+        return slack_url_verification(body)
+    else:
+        return respond(None, event)
