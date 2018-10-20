@@ -25,14 +25,14 @@ def find_taco(message):
     searchObj = re.search(taco_re, message, re.M | re.I)
 
     if searchObj:
-        print("Found " + taco_name)
+        return True
     else:
-        print("No taco")
-
+        return False
 
 
 def slack_message(body):
-    find_taco(body['event']['text'])
+    if find_taco(body['event']['text']):
+        if os.getenv('DEBUG', 'false') == 'true': print("Found taco")
 
     return respond(None, {
         'status': 'ok'
