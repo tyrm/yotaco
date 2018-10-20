@@ -1,12 +1,18 @@
 from __future__ import print_function
 
 import boto3
+import datetime
 import json
 import os
 import re
 
 print('Loading function')
 dynamo = boto3.client('dynamodb')
+
+debug = os.getenv('DEBUG', 'false')
+taco_name = os.getenv('EMOJI', 'taco')
+timezone = os.getenv('TZ_OFFSET', 0)
+verification_token = os.environ['SLACK_VERIF_TOKEN']
 
 
 def respond(err, res=None):
@@ -20,22 +26,34 @@ def respond(err, res=None):
 
 
 def find_taco(message):
-    taco_name = os.getenv('EMOJI', 'taco')
     taco_re = r':' + re.escape(taco_name) + r':'
     values = re.findall(taco_re, message)
-    return len(values)
 
 
-def find_users(message):
-    values = re.findall(r'<@U[a-zA-Z0-9]+>', message)
-    print(values)
+def find_users(message, myself):
+    values = re.findall(r'<@(U[a-zA-Z0-9]+)>', message)
+    users = list(set(values))
+
+    # Don't allow user to taco themselves
+    try:
+        myself_index = users.index(myself)
+        if debug == 'true': print('User tried to taco themself')
+        users.pop(myself_index)
+    except:
+        pass
+
+    return users
 
 
 def slack_message(body):
-    taco_count = find_taco(body['event']['text'])
-    if taco_count > 0:
-        if os.getenv('DEBUG', 'false') == 'true': print("Found "+ str(taco_count) + " taco(s)")
-        find_users(body['event']['text'])
+    # Find taco in channel messages
+    if body['event']['channel_type'] == 'channel':
+        taco_count = find_taco(body['event']['text'])
+        if taco_count > 0:
+            if debug == 'true': print("Found " + str(taco_count) + " taco(s)")
+            taco_users = find_users(body['event']['text'], body['event']['user'])
+
+            print("i should check to see if you have " + str(taco_count * len(taco_users)) + " tacos")
 
     return respond(None, {
         'status': 'ok'
@@ -49,6 +67,9 @@ def slack_url_verification(body):
 
 
 def lambda_handler(event, context):
+    st = datetime.datetime.now() + datetime.timedelta(hours=int(timezone))
+    print(st.strftime('%Y-%m-%d %H:%M:%S'))
+
     # Get POST body
     try:
         body = json.loads(event['body'])
@@ -56,11 +77,11 @@ def lambda_handler(event, context):
         return respond(e)
 
     # Check Token
-    if body['token'] != os.environ['SLACK_VERIF_TOKEN']:
+    if body['token'] != verification_token:
         return respond(Exception('Invalid Token'))
 
     # Route Body
-    if os.getenv('DEBUG', 'false') == 'true':
+    if debug == 'true':
         print("Got body: " + json.dumps(body, indent=2))
 
     if body['type'] == 'url_verification':
