@@ -57,11 +57,8 @@ def lambda_handler(event, context):
         return respond(Exception('Invalid Token'))
 
     # Route Body
-    try:
-        if os.environ['DEBUG'] == 'true':
-            print("Got body: " + json.dumps(body, indent=2))
-    except:
-        pass
+    if os.getenv('DEBUG', 'false') == 'true':
+        print("Got body: " + json.dumps(body, indent=2))
 
     if body['type'] == 'url_verification':
         return slack_url_verification(body)
