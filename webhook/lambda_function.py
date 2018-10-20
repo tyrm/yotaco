@@ -26,10 +26,16 @@ def find_taco(message):
     return len(values)
 
 
+def find_users(message):
+    values = re.findall(r'<@U[a-zA-Z0-9]+>', message)
+    print(values)
+
+
 def slack_message(body):
     taco_count = find_taco(body['event']['text'])
     if taco_count > 0:
         if os.getenv('DEBUG', 'false') == 'true': print("Found "+ str(taco_count) + " taco(s)")
+        find_users(body['event']['text'])
 
     return respond(None, {
         'status': 'ok'
