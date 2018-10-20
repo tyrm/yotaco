@@ -22,17 +22,14 @@ def respond(err, res=None):
 def find_taco(message):
     taco_name = os.getenv('EMOJI', 'taco')
     taco_re = r':' + re.escape(taco_name) + r':'
-    searchObj = re.search(taco_re, message, re.M | re.I)
-
-    if searchObj:
-        return True
-    else:
-        return False
+    values = re.findall(taco_re, message)
+    return len(values)
 
 
 def slack_message(body):
-    if find_taco(body['event']['text']):
-        if os.getenv('DEBUG', 'false') == 'true': print("Found taco")
+    taco_count = find_taco(body['event']['text'])
+    if taco_count > 0:
+        if os.getenv('DEBUG', 'false') == 'true': print("Found "+ str(taco_count) + " taco(s)")
 
     return respond(None, {
         'status': 'ok'
