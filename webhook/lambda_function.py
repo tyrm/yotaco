@@ -6,6 +6,7 @@ import datetime
 import json
 import os
 import re
+import requests
 
 print('Loading function')
 dynamo = boto3.client('dynamodb')
@@ -14,7 +15,7 @@ debug = os.getenv('DEBUG', 'false')
 taco_name = os.getenv('EMOJI', 'taco')
 timezone = os.getenv('TZ_OFFSET', 0)
 verification_token = os.environ['SLACK_VERIF_TOKEN']
-webhook_token = os.environ['SLACK_WEBHOOK_TOKEN']
+bot_token = os.environ['SLACK_BOT_TOKEN']
 
 
 def dynamo_get_tacos_avail(user):
@@ -27,26 +28,6 @@ def dynamo_get_tacos_avail(user):
     )
 
     return 5 - response['Count']
-
-
-def get_epoch(ts):
-    return int(((ts - datetime.datetime(1970, 1, 1)) - datetime.timedelta(hours=int(timezone))).total_seconds())
-
-
-def get_local_midnight():
-    st = datetime.datetime.now() + datetime.timedelta(hours=int(timezone))
-    midnight = datetime.datetime(st.year, st.month, st.day, 0, 0, 0)
-    return midnight
-
-
-def respond(err, res=None):
-    return {
-        'statusCode': '400' if err else '200',
-        'body': err.message if err else json.dumps(res),
-        'headers': {
-            'Content-Type': 'application/json',
-        },
-    }
 
 
 def find_taco(message):
@@ -70,6 +51,30 @@ def find_users(message, myself):
     return users
 
 
+def get_epoch(ts):
+    return int(((ts - datetime.datetime(1970, 1, 1)) - datetime.timedelta(hours=int(timezone))).total_seconds())
+
+
+def get_local_midnight():
+    st = datetime.datetime.now() + datetime.timedelta(hours=int(timezone))
+    midnight = datetime.datetime(st.year, st.month, st.day, 0, 0, 0)
+    return midnight
+
+
+def respond(err, res=None):
+    return {
+        'statusCode': '400' if err else '200',
+        'body': err.message if err else json.dumps(res),
+        'headers': {
+            'Content-Type': 'application/json',
+        },
+    }
+
+
+def send_slack_message(message, channel):
+    r = requests.get('https://slack.com/api/chat.postMessage', params={"token": bot_token, "text": message, "channel": channel,"mrkdwn": True})
+
+
 def slack_message(body):
     # Find taco in channel messages
     if body['event']['channel_type'] == 'channel':
@@ -83,6 +88,7 @@ def slack_message(body):
 
             if my_tacos_avail >= (taco_count * len(taco_users)):
                 if debug == 'true': print("you can give these tacos")
+                send_slack_message("response", body['event']['channel'])
 
     return respond(None, {
         'status': 'ok'
@@ -95,6 +101,7 @@ def slack_url_verification(body):
     })
 
 
+# main
 def lambda_handler(event, context):
     midnight = get_local_midnight()
     print(midnight.strftime('%Y-%m-%d %H:%M:%S'))
