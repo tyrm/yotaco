@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import boto3
+from boto3.dynamodb.conditions import Key, Attr
 import datetime
 import json
 import os
@@ -13,6 +14,29 @@ debug = os.getenv('DEBUG', 'false')
 taco_name = os.getenv('EMOJI', 'taco')
 timezone = os.getenv('TZ_OFFSET', 0)
 verification_token = os.environ['SLACK_VERIF_TOKEN']
+
+def dynamo_get_tacos_avail(user):
+    dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
+    table = dynamodb.Table('taco_transactions')
+
+    response = table.scan(
+        Select='ALL_ATTRIBUTES',
+        FilterExpression=Key('from').eq(user) & Key('timestamp').gte(get_epoch(get_local_midnight()))
+    )
+
+    print(response['Count'])
+
+    return 5 - response['Count']
+
+
+def get_epoch(ts):
+    return int(((ts - datetime.datetime(1970, 1, 1)) - datetime.timedelta(hours=int(timezone))).total_seconds())
+
+
+def get_local_midnight():
+    st = datetime.datetime.now() + datetime.timedelta(hours=int(timezone))
+    midnight = datetime.datetime(st.year, st.month, st.day, 0, 0, 0)
+    return midnight
 
 
 def respond(err, res=None):
@@ -55,6 +79,8 @@ def slack_message(body):
             taco_users = find_users(body['event']['text'], body['event']['user'])
 
             print("i should check to see if you have " + str(taco_count * len(taco_users)) + " tacos")
+            my_tacos_avail = dynamo_get_tacos_avail(body['event']['user'])
+            print("you have " + str(my_tacos_avail) + " taco(s)")
 
     return respond(None, {
         'status': 'ok'
@@ -68,8 +94,9 @@ def slack_url_verification(body):
 
 
 def lambda_handler(event, context):
-    st = datetime.datetime.now() + datetime.timedelta(hours=int(timezone))
-    print(st.strftime('%Y-%m-%d %H:%M:%S'))
+    midnight = get_local_midnight()
+    print(midnight.strftime('%Y-%m-%d %H:%M:%S'))
+    print(get_epoch(midnight))
 
     # Get POST body
     try:
