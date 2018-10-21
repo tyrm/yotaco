@@ -14,6 +14,8 @@ debug = os.getenv('DEBUG', 'false')
 taco_name = os.getenv('EMOJI', 'taco')
 timezone = os.getenv('TZ_OFFSET', 0)
 verification_token = os.environ['SLACK_VERIF_TOKEN']
+webhook_token = os.environ['SLACK_WEBHOOK_TOKEN']
+
 
 def dynamo_get_tacos_avail(user):
     dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
@@ -23,8 +25,6 @@ def dynamo_get_tacos_avail(user):
         Select='ALL_ATTRIBUTES',
         FilterExpression=Key('from').eq(user) & Key('timestamp').gte(get_epoch(get_local_midnight()))
     )
-
-    print(response['Count'])
 
     return 5 - response['Count']
 
@@ -78,9 +78,11 @@ def slack_message(body):
             if debug == 'true': print("Found " + str(taco_count) + " taco(s)")
             taco_users = find_users(body['event']['text'], body['event']['user'])
 
-            print("i should check to see if you have " + str(taco_count * len(taco_users)) + " tacos")
             my_tacos_avail = dynamo_get_tacos_avail(body['event']['user'])
-            print("you have " + str(my_tacos_avail) + " taco(s)")
+            if debug == 'true': print("you have " + str(my_tacos_avail) + " taco(s)")
+
+            if my_tacos_avail >= (taco_count * len(taco_users)):
+                if debug == 'true': print("you can give these tacos")
 
     return respond(None, {
         'status': 'ok'
