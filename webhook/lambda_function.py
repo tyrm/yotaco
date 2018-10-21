@@ -89,13 +89,14 @@ def send_message_you_got_taco(user, tc, fromu, channel, message):
 
 def send_message_you_sent_taco(user, tc, tou, tr):
     p = inflect.engine()
-    text = "<@" + tou + "> received *" + str(tc) + " " + p.plural(taco_name, tc) + "* from you. You have *" + str(tr) + " " + p.plural(taco_name, tr) + "* left to give out today."
+    text = "<@" + tou + "> received *" + str(tc) + " " + p.plural(taco_name, tc) + "* from you. You have *" + \
+           str(tr) + " " + p.plural(taco_name, tr) + "* left to give out today."
 
     send_slack_message(text, user)
 
 
 def send_slack_message(message, channel, attachment=None):
-    params = {"token": bot_token, "text": message, "channel": channel,"as_user": True}
+    params = {"token": bot_token, "text": message, "channel": channel, "as_user": True}
     if attachment != None:
         params['attachments'] = attachment
 
