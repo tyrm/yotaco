@@ -83,6 +83,12 @@ def get_local_midnight():
     return midnight
 
 
+def get_time_to_next_midnight():
+    st = datetime.datetime.now() + datetime.timedelta(hours=int(timezone))
+    next_midnight = datetime.datetime(st.year, st.month, st.day, 0, 0, 0) + datetime.timedelta(hours=24)
+    return next_midnight - st
+
+
 def process_tacos(tc, tu, tr, body):
     index = 1
     for user in tu:
@@ -107,6 +113,21 @@ def respond(err, res=None):
     }
 
 
+def send_message_not_enough_tacos(user, tried, tr, channel):
+    p = inflect.engine()
+    delta = get_time_to_next_midnight()
+    delta_values = divmod(delta.days * 86400 + delta.seconds, 60)
+
+    hours = delta_values[0] / 60
+    minutes = delta_values[0] % 60
+
+    text = "Whoops! You tried to give *" + str(tried) + "* " + p.plural(taco_name, tried) + ". You have *" + str(tr) + \
+           "* " + p.plural(taco_name, tr) + " left to give today. Your " + p.plural(taco_name) + \
+           " will reset in *" + str(hours) + " hours and " + str(minutes) + " minutes*."
+
+    send_slack_ephemeral(text, channel, user)
+
+
 def send_message_you_got_taco(user, tc, fromu, channel, message):
     p = inflect.engine()
     text = "You received *" + str(tc) + " " + p.plural(taco_name, tc) + "* from <@" + fromu + "> in <#" + channel + ">"
@@ -124,6 +145,12 @@ def send_message_you_sent_taco(user, tc, tu, tr):
            str(tr) + " " + p.plural(taco_name, tr) + "* left to give out today."
 
     send_slack_message(text, user)
+
+
+def send_slack_ephemeral(message, channel, user):
+    params = {"token": bot_token, "text": message, "channel": channel, "user": user, "as_user": True}
+
+    r = requests.get('https://slack.com/api/chat.postEphemeral', params=params)
 
 
 def send_slack_message(message, channel, attachment=None):
@@ -145,9 +172,13 @@ def slack_message(body):
                 my_tacos_avail = dynamo_get_tacos_avail(body['event']['user'])
                 if debug == 'true': print("you have " + str(my_tacos_avail) + " taco(s)")
 
-                if my_tacos_avail >= (taco_count * len(taco_users)):
+                taco_tries = taco_count * len(taco_users)
+                if my_tacos_avail >= taco_tries:
                     if debug == 'true': print("you can give these tacos")
                     process_tacos(taco_count, taco_users, my_tacos_avail, body)
+                else:
+                    send_message_not_enough_tacos(body['event']['user'], taco_tries, my_tacos_avail,
+                                                  body['event']['channel'])
 
     return respond(None, {
         'status': 'ok'
@@ -162,7 +193,7 @@ def slack_url_verification(body):
 
 # main
 def lambda_handler(event, context):
-    midnight = get_local_midnight()
+    midnight = datetime.datetime.now() + datetime.timedelta(hours=int(timezone))
     print(midnight.strftime('%Y-%m-%d %H:%M:%S'))
     print(get_epoch(midnight))
 
