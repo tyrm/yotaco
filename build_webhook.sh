@@ -3,7 +3,7 @@
 # Zip it up
 rm -Rvf lambda-webhook.zip
 cd webhook
-zip -r ../lambda-webhook.zip *
+zip -r ../lambda-webhook.zip * -x *.pyc -x *_test.py
 cd ..
 
 # Put it in AWS
