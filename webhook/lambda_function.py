@@ -34,9 +34,6 @@ def dynamo_add_taco(ts, index, team, channel, fromu, tou):
             'to': tou
         }
     )
-
-    print(json.dumps(response, indent=4))
-
     return
 
 
@@ -45,10 +42,12 @@ def dynamo_get_tacos_avail(user):
     table = dynamodb.Table('taco_transactions')
 
     response = table.scan(
-        Select='ALL_ATTRIBUTES',
+        IndexName='from-timestamp-index',
+        Select='COUNT',
         FilterExpression=Key('from').eq(user) & Key('timestamp').gte(get_epoch(get_local_midnight()))
     )
 
+    print(response)
     return 5 - response['Count']
 
 
@@ -133,6 +132,25 @@ def send_message_not_enough_tacos(user, tried, tr, channel):
     send_slack_ephemeral(text, channel, user)
 
 
+def send_message_tacos_available(user, tr):
+    p = inflect.engine()
+    delta = get_time_to_next_midnight()
+    delta_values = divmod(delta.days * 86400 + delta.seconds, 60)
+
+    hours = delta_values[0] / 60
+    minutes = delta_values[0] % 60
+
+    text = "You have *" + str(tr) + "* " + p.plural(taco_name, tr) + " left to give today. Your " + \
+           p.plural(taco_name) + " will reset in *"
+
+    if hours > 0:
+        text = text + str(hours) + " hours and "
+
+    text = text + str(minutes) + " minutes*."
+
+    send_slack_message(text, user)
+
+
 def send_message_you_got_taco(user, tc, fromu, channel, message):
     p = inflect.engine()
     text = "You received *" + str(tc) + " " + p.plural(taco_name, tc) + "* from <@" + fromu + "> in <#" + channel + ">"
@@ -184,6 +202,12 @@ def slack_message(body):
                 else:
                     send_message_not_enough_tacos(body['event']['user'], taco_tries, my_tacos_avail,
                                                   body['event']['channel'])
+    elif body['event']['channel_type'] == 'im' and body['authed_users'][0] != body['event']['user']:
+        p = inflect.engine()
+        if body['event']['text'] ==  p.plural(taco_name):
+            my_tacos_avail = dynamo_get_tacos_avail(body['event']['user'])
+            send_message_tacos_available(body['event']['user'], my_tacos_avail)
+
 
     return respond(None, {
         'status': 'ok'
