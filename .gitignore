@@ -1,5 +1,10 @@
 lambda-webhook.zip
 
+webhook
+!webhook/lambda_function.py
+!webhook/lambda_function_test.py
+!webhook/requirements.py
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
