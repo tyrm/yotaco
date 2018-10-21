@@ -3,8 +3,7 @@ python:
   - "2.7"
 
 env:
-  - AWS_DEFAULT_REGION=us-west-2
-  - SLACK_VERIF_TOKEN=1234567890abcdef12345678
+  - AWS_DEFAULT_REGION=us-west-2 SLACK_VERIF_TOKEN=1234567890abcdef12345678
 
 install:
   - pip install -r webhook/requirements.txt
