@@ -39,10 +39,10 @@ def dynamo_add_taco(ts, index, team, channel, fromu, tou):
 
     # Update Taco Counts
     count_ids = [
-        get_cid_this_month(),
-        get_cid_this_week(),
-        get_cid_this_year(),
-        get_cid_today()
+        get_cid_this_month(team),
+        get_cid_this_week(team),
+        get_cid_this_year(team),
+        get_cid_today(team)
     ]
 
     count_table = dynamodb.Table('taco_counts')
@@ -53,8 +53,8 @@ def dynamo_add_taco(ts, index, team, channel, fromu, tou):
                     'cid': cid
                 },
                 UpdateExpression="set #attrName = #attrName + :attrValue",
-                ExpressionAttributeNames = {
-                    "#attrName" : tou
+                ExpressionAttributeNames={
+                    "#attrName": tou
                 },
                 ExpressionAttributeValues={
                     ':attrValue': decimal.Decimal(1)
@@ -71,8 +71,8 @@ def dynamo_add_taco(ts, index, team, channel, fromu, tou):
                         'cid': cid
                     },
                     UpdateExpression="set #attrName = :attrValue",
-                    ExpressionAttributeNames = {
-                        "#attrName" : tou
+                    ExpressionAttributeNames={
+                        "#attrName": tou
                     },
                     ExpressionAttributeValues={
                         ':attrValue': decimal.Decimal(1)
@@ -121,24 +121,24 @@ def find_users(message, myself):
     return users
 
 
-def get_cid_this_month():
+def get_cid_this_month(team):
     midnight = get_local_midnight()
-    return midnight.strftime('%Y-M%m')
+    return midnight.strftime('%Y-M%m') + "-" + team
 
 
-def get_cid_this_week():
+def get_cid_this_week(team):
     midnight = get_local_midnight()
-    return midnight.strftime('%Y-W%U')
+    return midnight.strftime('%Y-W%U') + "-" + team
 
 
-def get_cid_this_year():
+def get_cid_this_year(team):
     midnight = get_local_midnight()
-    return midnight.strftime('%Y')
+    return midnight.strftime('%Y') + "-" + team
 
 
-def get_cid_today():
+def get_cid_today(team):
     midnight = get_local_midnight()
-    return midnight.strftime('%Y-%m-%d')
+    return midnight.strftime('%Y-%m-%d') + "-" + team
 
 
 def get_epoch(ts):
@@ -281,10 +281,9 @@ def slack_message(body):
                                                   body['event']['channel'])
     elif body['event']['channel_type'] == 'im' and body['authed_users'][0] != body['event']['user']:
         p = inflect.engine()
-        if body['event']['text'] ==  p.plural(taco_name):
+        if body['event']['text'] == p.plural(taco_name):
             my_tacos_avail = dynamo_get_tacos_avail(body['event']['user'])
             send_message_tacos_available(body['event']['user'], my_tacos_avail)
-
 
     return respond(None, {
         'status': 'ok'
