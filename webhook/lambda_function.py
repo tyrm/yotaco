@@ -61,6 +61,13 @@ def get_local_midnight():
     return midnight
 
 
+def process_tacos(tc, tu, body):
+    for user in tu:
+        send_message_you_sent_taco(body['event']['user'], tc, user, 0)
+        send_message_you_got_taco(user, tc, body['event']['user'], body['event']['channel'], body['event']['text'])
+    return
+
+
 def respond(err, res=None):
     return {
         'statusCode': '400' if err else '200',
@@ -71,8 +78,28 @@ def respond(err, res=None):
     }
 
 
-def send_slack_message(message, channel):
-    r = requests.get('https://slack.com/api/chat.postMessage', params={"token": bot_token, "text": message, "channel": channel,"mrkdwn": True})
+def send_message_you_got_taco(user, tc, fromu, channel, message):
+    text = "You received *" + str(tc) + " taco* from <@" + fromu + "> in <#" + channel + ">"
+    attachment = "[{\"text\": \"" + message + "\"}]"
+
+    send_slack_message(text, user, attachment)
+
+
+def send_message_you_sent_taco(user, tc, tou, tr):
+    text = "<@" + tou + "> received *" + str(tc) + " taco* from you. You have *" + str(tr)
+    if tr == 1:
+        text = text + " taco* left to give out today."
+    else:
+        text = text + " tacos* left to give out today."
+    send_slack_message(text, user)
+
+
+def send_slack_message(message, channel, attachment=None):
+    params = {"token": bot_token, "text": message, "channel": channel,"as_user": True}
+    if attachment != None:
+        params['attachments'] = attachment
+
+    r = requests.get('https://slack.com/api/chat.postMessage', params=params)
 
 
 def slack_message(body):
@@ -88,7 +115,7 @@ def slack_message(body):
 
             if my_tacos_avail >= (taco_count * len(taco_users)):
                 if debug == 'true': print("you can give these tacos")
-                send_slack_message("response", body['event']['channel'])
+                process_tacos(taco_count, taco_users, body)
 
     return respond(None, {
         'status': 'ok'
