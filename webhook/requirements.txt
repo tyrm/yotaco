@@ -1,3 +1,4 @@
 boto3>=1.0,<=2.0
+git+https://github.com/tyrm/inflect.git@add_tacos#egg=inflect
 requests>=2.0,<=3.0
 urllib3==1.23

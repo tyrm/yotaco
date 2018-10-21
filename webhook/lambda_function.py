@@ -3,6 +3,7 @@ from __future__ import print_function
 import boto3
 from boto3.dynamodb.conditions import Key, Attr
 import datetime
+import inflect
 import json
 import os
 import re
@@ -79,18 +80,17 @@ def respond(err, res=None):
 
 
 def send_message_you_got_taco(user, tc, fromu, channel, message):
-    text = "You received *" + str(tc) + " taco* from <@" + fromu + "> in <#" + channel + ">"
+    p = inflect.engine()
+    text = "You received *" + str(tc) + " " + p.plural(taco_name, tc) + "* from <@" + fromu + "> in <#" + channel + ">"
     attachment = "[{\"text\": \"" + message + "\"}]"
 
     send_slack_message(text, user, attachment)
 
 
 def send_message_you_sent_taco(user, tc, tou, tr):
-    text = "<@" + tou + "> received *" + str(tc) + " taco* from you. You have *" + str(tr)
-    if tr == 1:
-        text = text + " taco* left to give out today."
-    else:
-        text = text + " tacos* left to give out today."
+    p = inflect.engine()
+    text = "<@" + tou + "> received *" + str(tc) + " " + p.plural(taco_name, tc) + "* from you. You have *" + str(tr) + " " + p.plural(taco_name, tr) + "* left to give out today."
+
     send_slack_message(text, user)
 
 
