@@ -123,7 +123,12 @@ def send_message_not_enough_tacos(user, tried, tr, channel):
 
     text = "Whoops! You tried to give *" + str(tried) + "* " + p.plural(taco_name, tried) + ". You have *" + str(tr) + \
            "* " + p.plural(taco_name, tr) + " left to give today. Your " + p.plural(taco_name) + \
-           " will reset in *" + str(hours) + " hours and " + str(minutes) + " minutes*."
+           " will reset in *"
+
+    if hours > 0:
+        text = text + str(hours) + " hours and "
+
+    text = text + str(minutes) + " minutes*."
 
     send_slack_ephemeral(text, channel, user)
 
