@@ -3,7 +3,7 @@
 # Zip it up
 rm -Rvf lambda-webhook.zip
 cd webhook
-pip install -r requirements.txt -t ./
+#pip install -r requirements.txt -t ./
 zip -9 -r ../lambda-webhook.zip * -x *.pyc -x *_test.py
 cd ..
 
