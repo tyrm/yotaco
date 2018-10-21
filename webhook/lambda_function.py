@@ -2,6 +2,7 @@ from __future__ import print_function
 
 import boto3
 from boto3.dynamodb.conditions import Key, Attr
+from botocore.exceptions import ClientError
 import datetime
 import decimal
 import inflect
@@ -22,9 +23,10 @@ bot_token = os.environ['SLACK_BOT_TOKEN']
 
 def dynamo_add_taco(ts, index, team, channel, fromu, tou):
     dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
-    table = dynamodb.Table('taco_transactions')
 
-    response = table.put_item(
+    # Add Taco Transaction
+    transaction_table = dynamodb.Table('taco_transactions')
+    transaction_table.put_item(
         Item={
             'tid': str(ts) + "-" + team + "-" + channel + "-" + str(index),
             'timestamp': decimal.Decimal(ts),
@@ -34,6 +36,53 @@ def dynamo_add_taco(ts, index, team, channel, fromu, tou):
             'to': tou
         }
     )
+
+    # Update Taco Counts
+    count_ids = [
+        get_cid_this_month(),
+        get_cid_this_week(),
+        get_cid_this_year(),
+        get_cid_today()
+    ]
+
+    count_table = dynamodb.Table('taco_counts')
+    for cid in count_ids:
+        try:
+            response = count_table.update_item(
+                Key={
+                    'cid': cid
+                },
+                UpdateExpression="set #attrName = #attrName + :attrValue",
+                ExpressionAttributeNames = {
+                    "#attrName" : tou
+                },
+                ExpressionAttributeValues={
+                    ':attrValue': decimal.Decimal(1)
+                },
+                ReturnValues="NONE"
+            )
+            print(response)
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'ValidationException':
+                # Creating new top level attribute `info` (with nested props)
+                # if the previous query failed
+                response = count_table.update_item(
+                    Key={
+                        'cid': cid
+                    },
+                    UpdateExpression="set #attrName = :attrValue",
+                    ExpressionAttributeNames = {
+                        "#attrName" : tou
+                    },
+                    ExpressionAttributeValues={
+                        ':attrValue': decimal.Decimal(1)
+                    },
+                    ReturnValues="NONE"
+                )
+                print(response)
+            else:
+                raise
+
     return
 
 
@@ -70,6 +119,26 @@ def find_users(message, myself):
         pass
 
     return users
+
+
+def get_cid_this_month():
+    midnight = get_local_midnight()
+    return midnight.strftime('%Y-M%m')
+
+
+def get_cid_this_week():
+    midnight = get_local_midnight()
+    return midnight.strftime('%Y-W%U')
+
+
+def get_cid_this_year():
+    midnight = get_local_midnight()
+    return midnight.strftime('%Y')
+
+
+def get_cid_today():
+    midnight = get_local_midnight()
+    return midnight.strftime('%Y-%m-%d')
 
 
 def get_epoch(ts):
@@ -110,6 +179,14 @@ def respond(err, res=None):
             'Content-Type': 'application/json',
         },
     }
+
+
+def send_message_leaderboard(channel, tc, fromu, message):
+    p = inflect.engine()
+    text = "You received *" + str(tc) + " " + p.plural(taco_name, tc) + "* from <@" + fromu + "> in <#" + channel + ">"
+    attachment = "[{\"text\": \"" + message + "\"}]"
+
+    send_slack_message(text, channel, attachment)
 
 
 def send_message_not_enough_tacos(user, tried, tr, channel):
