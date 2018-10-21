@@ -87,12 +87,13 @@ def process_tacos(tc, tu, tr, body):
     index = 1
     for user in tu:
         for x in range(tc):
-            dynamo_add_taco(body['event']['event_ts'], index, body['team_id'], body['event']['channel'], body['event']['user'], user)
+            dynamo_add_taco(body['event']['event_ts'], index, body['team_id'], body['event']['channel'],
+                            body['event']['user'], user)
             index = index + 1
 
         send_message_you_got_taco(user, tc, body['event']['user'], body['event']['channel'], body['event']['text'])
 
-    send_message_you_sent_taco(body['event']['user'], tc, tu, tr-(index-1))
+    send_message_you_sent_taco(body['event']['user'], tc, tu, tr - (index - 1))
     return
 
 
