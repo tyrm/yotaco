@@ -28,6 +28,7 @@ def respond(err, res=None):
 def find_taco(message):
     taco_re = r':' + re.escape(taco_name) + r':'
     values = re.findall(taco_re, message)
+    return len(values)
 
 
 def find_users(message, myself):
