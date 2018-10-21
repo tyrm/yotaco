@@ -1,4 +1,4 @@
-# yotaco
+# yotaco [![Build Status](https://travis-ci.org/tyrm/yotaco.svg?branch=master)](https://travis-ci.org/tyrm/yotaco)
 Blatant heytaco rip off
 
 ## webhook
