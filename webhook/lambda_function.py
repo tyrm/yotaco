@@ -3,6 +3,7 @@ from __future__ import print_function
 import boto3
 from boto3.dynamodb.conditions import Key, Attr
 import datetime
+import decimal
 import inflect
 import json
 import os
@@ -17,6 +18,26 @@ taco_name = os.getenv('EMOJI', 'taco')
 timezone = os.getenv('TZ_OFFSET', 0)
 verification_token = os.environ['SLACK_VERIF_TOKEN']
 bot_token = os.environ['SLACK_BOT_TOKEN']
+
+
+def dynamo_add_taco(ts, index, team, channel, fromu, tou):
+    dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
+    table = dynamodb.Table('taco_transactions')
+
+    response = table.put_item(
+        Item={
+            'tid': str(ts) + "-" + team + "-" + channel + "-" + str(index),
+            'timestamp': decimal.Decimal(ts),
+            'channel': channel,
+            'team': team,
+            'from': fromu,
+            'to': tou
+        }
+    )
+
+    print(json.dumps(response, indent=4))
+
+    return
 
 
 def dynamo_get_tacos_avail(user):
@@ -62,10 +83,16 @@ def get_local_midnight():
     return midnight
 
 
-def process_tacos(tc, tu, body):
+def process_tacos(tc, tu, tr, body):
+    index = 1
     for user in tu:
-        send_message_you_sent_taco(body['event']['user'], tc, user, 0)
+        for x in range(tc):
+            dynamo_add_taco(body['event']['event_ts'], index, body['team_id'], body['event']['channel'], body['event']['user'], user)
+            index = index + 1
+
         send_message_you_got_taco(user, tc, body['event']['user'], body['event']['channel'], body['event']['text'])
+
+    send_message_you_sent_taco(body['event']['user'], tc, tu, tr-(index-1))
     return
 
 
@@ -87,9 +114,12 @@ def send_message_you_got_taco(user, tc, fromu, channel, message):
     send_slack_message(text, user, attachment)
 
 
-def send_message_you_sent_taco(user, tc, tou, tr):
+def send_message_you_sent_taco(user, tc, tu, tr):
     p = inflect.engine()
-    text = "<@" + tou + "> received *" + str(tc) + " " + p.plural(taco_name, tc) + "* from you. You have *" + \
+    text = ""
+    for tuser in tu:
+        text = text + "<@" + tuser + "> "
+    text = text + "received *" + str(tc) + " " + p.plural(taco_name, tc) + "* from you. You have *" + \
            str(tr) + " " + p.plural(taco_name, tr) + "* left to give out today."
 
     send_slack_message(text, user)
@@ -110,13 +140,13 @@ def slack_message(body):
         if taco_count > 0:
             if debug == 'true': print("Found " + str(taco_count) + " taco(s)")
             taco_users = find_users(body['event']['text'], body['event']['user'])
+            if len(taco_users) > 0:
+                my_tacos_avail = dynamo_get_tacos_avail(body['event']['user'])
+                if debug == 'true': print("you have " + str(my_tacos_avail) + " taco(s)")
 
-            my_tacos_avail = dynamo_get_tacos_avail(body['event']['user'])
-            if debug == 'true': print("you have " + str(my_tacos_avail) + " taco(s)")
-
-            if my_tacos_avail >= (taco_count * len(taco_users)):
-                if debug == 'true': print("you can give these tacos")
-                process_tacos(taco_count, taco_users, body)
+                if my_tacos_avail >= (taco_count * len(taco_users)):
+                    if debug == 'true': print("you can give these tacos")
+                    process_tacos(taco_count, taco_users, my_tacos_avail, body)
 
     return respond(None, {
         'status': 'ok'
