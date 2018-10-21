@@ -1,15 +1,15 @@
 lambda-webhook.zip
 lambda-msg_processor.zip
 
-webhook
+webhook/*
 !webhook/lambda_function.py
 !webhook/lambda_function_test.py
 !webhook/requirements.py
 
-msg_processor
+msg_processor/*
 !msg_processor/lambda_function.py
 !msg_processor/lambda_function_test.py
-!msg_processor/requirements.py
+!msg_processor/requirements.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
