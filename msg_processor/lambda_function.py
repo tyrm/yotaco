@@ -189,6 +189,14 @@ def get_time_to_next_midnight():
     return next_midnight - st
 
 
+def get_user_name(user_id):
+    params = {"token": bot_token, "user": user_id}
+    r = requests.get('https://slack.com/api/users.info', params=params)
+    user_info = r.json()
+
+    return user_info['user']['name']
+
+
 def process_tacos(tc, tu, tr, body):
     index = 1
     for user in tu:
@@ -220,10 +228,10 @@ def send_message_leaderboard(channel, team, time_range):
     if time_range == 'daily':
         message = message + "Today's "
         leaderboard = dynamo_get_leaderboard(get_cid_today(team))
-    if time_range == 'monthly':
+    elif time_range == 'monthly':
         message = message + "This Month's "
         leaderboard = dynamo_get_leaderboard(get_cid_this_month(team))
-    if time_range == 'yearly':
+    elif time_range == 'yearly':
         message = message + "This Year's "
         leaderboard = dynamo_get_leaderboard(get_cid_this_year(team))
     else:
@@ -235,7 +243,7 @@ def send_message_leaderboard(channel, team, time_range):
 
     index = 1
     for leader in leaderboard:
-        message = message + str(index) + "). " + leader[0] + " `" + str(leader[1]) + "`\n"
+        message = message + str(index) + "). " + get_user_name(leader[0]) + " `" + str(leader[1]) + "`\n"
         index = index + 1
 
     attachment = "[{\"text\": \"" + message + "\"}]"
@@ -337,8 +345,14 @@ def slack_message(body):
         if body['event']['text'] == p.plural(taco_name):
             my_tacos_avail = dynamo_get_tacos_avail(body['event']['user'])
             send_message_tacos_available(body['event']['user'], my_tacos_avail)
-        if body['event']['text'] == 'leaderboard':
+        if body['event']['text'] == 'leaderboard' or body['event']['text'] == 'leaderboard weekly':
             send_message_leaderboard(body['event']['user'], body['team_id'], 'weekly')
+        if body['event']['text'] == 'leaderboard daily' or body['event']['text'] == 'leaderboard today':
+            send_message_leaderboard(body['event']['user'], body['team_id'], 'daily')
+        if body['event']['text'] == 'leaderboard monthly':
+            send_message_leaderboard(body['event']['user'], body['team_id'], 'monthly')
+        if body['event']['text'] == 'leaderboard yearly':
+            send_message_leaderboard(body['event']['user'], body['team_id'], 'yearly')
 
     return
 
