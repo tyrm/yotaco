@@ -325,7 +325,7 @@ def send_slack_message(message, channel, attachment=None):
 
 def slack_message(body):
     # Find taco in channel messages
-    if body['event']['channel_type'] == 'channel':
+    if (body['event']['channel_type'] == 'channel' or body['event']['channel_type'] == 'group') and 'text' in body['event']:
         taco_count = find_taco(body['event']['text'])
         myself_re = re.compile(r':' + re.escape(taco_name) + r':')
 
