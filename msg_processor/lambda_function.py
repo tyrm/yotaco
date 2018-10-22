@@ -326,6 +326,8 @@ def slack_message(body):
     # Find taco in channel messages
     if body['event']['channel_type'] == 'channel':
         taco_count = find_taco(body['event']['text'])
+        myself_re = re.compile(r':' + re.escape(taco_name) + r':')
+
         if taco_count > 0:
             if debug == 'true': print("Found " + str(taco_count) + " taco(s)")
             taco_users = find_users(body['event']['text'], body['event']['user'])
@@ -340,18 +342,31 @@ def slack_message(body):
                 else:
                     send_message_not_enough_tacos(body['event']['user'], taco_tries, my_tacos_avail,
                                                   body['event']['channel'])
+        elif body['event']['text'].find("<@" + body['authed_users'][0] + "> ") != -1:
+            if body['event']['text'].find("leaderboard") != -1:
+                if body['event']['text'].find("leaderboard weekly") != -1:
+                    send_message_leaderboard(body['event']['channel'], body['team_id'], 'weekly')
+                elif body['event']['text'].find("leaderboard daily") != -1 or body['event']['text'].find("leaderboard today") != -1:
+                    send_message_leaderboard(body['event']['channel'], body['team_id'], 'daily')
+                elif body['event']['text'].find("leaderboard monthly") != -1:
+                    send_message_leaderboard(body['event']['channel'], body['team_id'], 'monthly')
+                elif body['event']['text'].find("leaderboard yearly") != -1:
+                    send_message_leaderboard(body['event']['channel'], body['team_id'], 'yearly')
+                else:
+                    send_message_leaderboard(body['event']['channel'], body['team_id'], 'weekly')
+
     elif body['event']['channel_type'] == 'im' and body['authed_users'][0] != body['event']['user']:
         p = inflect.engine()
         if body['event']['text'] == p.plural(taco_name):
             my_tacos_avail = dynamo_get_tacos_avail(body['event']['user'])
             send_message_tacos_available(body['event']['user'], my_tacos_avail)
-        if body['event']['text'] == 'leaderboard' or body['event']['text'] == 'leaderboard weekly':
+        elif body['event']['text'] == 'leaderboard' or body['event']['text'] == 'leaderboard weekly':
             send_message_leaderboard(body['event']['user'], body['team_id'], 'weekly')
-        if body['event']['text'] == 'leaderboard daily' or body['event']['text'] == 'leaderboard today':
+        elif body['event']['text'] == 'leaderboard daily' or body['event']['text'] == 'leaderboard today':
             send_message_leaderboard(body['event']['user'], body['team_id'], 'daily')
-        if body['event']['text'] == 'leaderboard monthly':
+        elif body['event']['text'] == 'leaderboard monthly':
             send_message_leaderboard(body['event']['user'], body['team_id'], 'monthly')
-        if body['event']['text'] == 'leaderboard yearly':
+        elif body['event']['text'] == 'leaderboard yearly':
             send_message_leaderboard(body['event']['user'], body['team_id'], 'yearly')
 
     return
