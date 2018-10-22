@@ -175,6 +175,14 @@ def get_local_midnight():
     return midnight
 
 
+def get_team_name():
+    params = {"token": bot_token}
+    r = requests.get('https://slack.com/api/team.info', params=params)
+    team_info = r.json()
+
+    return team_info['team']['name']
+
+
 def get_time_to_next_midnight():
     st = datetime.datetime.now() + datetime.timedelta(hours=int(timezone))
     next_midnight = datetime.datetime(st.year, st.month, st.day, 0, 0, 0) + datetime.timedelta(hours=24)
@@ -205,10 +213,33 @@ def respond(err, res=None):
     }
 
 
-def send_message_leaderboard(channel, cid):
-    leaderboard = dynamo_get_leaderboard(cid)
+def send_message_leaderboard(channel, team, time_range):
+    leaderboard = []
+    message = "*"
 
-    send_slack_message(str(leaderboard), channel)
+    if time_range == 'daily':
+        message = message + "Today's "
+        leaderboard = dynamo_get_leaderboard(get_cid_today(team))
+    if time_range == 'monthly':
+        message = message + "This Month's "
+        leaderboard = dynamo_get_leaderboard(get_cid_this_month(team))
+    if time_range == 'yearly':
+        message = message + "This Year's "
+        leaderboard = dynamo_get_leaderboard(get_cid_this_year(team))
+    else:
+        message = message + "This Week's "
+        leaderboard = dynamo_get_leaderboard(get_cid_this_week(team))
+
+    message = message + get_team_name()
+    message = message + " Leaderboard*\n"
+
+    index = 1
+    for leader in leaderboard:
+        message = message + str(index) + "). " + leader[0] + " `" + str(leader[1]) + "`\n"
+        index = index + 1
+
+    attachment = "[{\"text\": \"" + message + "\"}]"
+    send_slack_message(None, channel, attachment)
 
 
 def send_message_not_enough_tacos(user, tried, tr, channel):
@@ -307,7 +338,7 @@ def slack_message(body):
             my_tacos_avail = dynamo_get_tacos_avail(body['event']['user'])
             send_message_tacos_available(body['event']['user'], my_tacos_avail)
         if body['event']['text'] == 'leaderboard':
-            send_message_leaderboard(body['event']['user'], get_cid_this_week(body['team_id']))
+            send_message_leaderboard(body['event']['user'], body['team_id'], 'weekly')
 
     return
 
