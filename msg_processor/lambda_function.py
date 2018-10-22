@@ -18,6 +18,7 @@ debug = os.getenv('DEBUG', 'false')
 taco_name = os.getenv('EMOJI', 'taco')
 timezone = os.getenv('TZ_OFFSET', 0)
 bot_token = os.environ['SLACK_BOT_TOKEN']
+bot_user  = os.environ['SLACK_BOT_USER']
 
 
 def dynamo_add_taco(ts, index, team, channel, fromu, tou):
@@ -342,8 +343,9 @@ def slack_message(body):
                 else:
                     send_message_not_enough_tacos(body['event']['user'], taco_tries, my_tacos_avail,
                                                   body['event']['channel'])
-        elif body['event']['text'].find("<@" + body['authed_users'][0] + "> ") != -1:
+        elif body['event']['text'].find("<@" + bot_user + "> ") != -1:
             if body['event']['text'].find("leaderboard") != -1:
+                if debug == 'true': print("found leaderboard in channel")
                 if body['event']['text'].find("leaderboard weekly") != -1:
                     send_message_leaderboard(body['event']['channel'], body['team_id'], 'weekly')
                 elif body['event']['text'].find("leaderboard daily") != -1 or body['event']['text'].find("leaderboard today") != -1:
@@ -355,7 +357,8 @@ def slack_message(body):
                 else:
                     send_message_leaderboard(body['event']['channel'], body['team_id'], 'weekly')
 
-    elif body['event']['channel_type'] == 'im' and body['authed_users'][0] != body['event']['user']:
+    elif body['event']['channel_type'] == 'im' and 'bot_id' not in ['event']:
+        if debug == 'true': print("got im: " + body['event']['text'])
         p = inflect.engine()
         if body['event']['text'] == p.plural(taco_name):
             my_tacos_avail = dynamo_get_tacos_avail(body['event']['user'])
