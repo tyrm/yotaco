@@ -85,6 +85,31 @@ def dynamo_add_taco(ts, index, team, channel, fromu, tou):
     return
 
 
+def dynamo_get_leaderboard(cid):
+    dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
+    table = dynamodb.Table('taco_counts')
+
+    # Get Requested Leaderboard
+    response = table.query(
+        KeyConditionExpression=Key('cid').eq(cid)
+    )
+    counts = response['Items'][0]
+    del counts['cid']
+
+    # Convert to list and sort
+    count_tups = []
+    for key, value in counts.iteritems():
+        count_tups.append((key, int(value)))
+
+    count_tups.sort(key=lambda s: s[1], reverse=True)
+
+    # Cut list to 10
+    if len(count_tups) > 10:
+        count_tups = count_tups[:10]
+
+    return count_tups
+
+
 def dynamo_get_tacos_avail(user):
     dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
     table = dynamodb.Table('taco_transactions')
@@ -180,12 +205,10 @@ def respond(err, res=None):
     }
 
 
-def send_message_leaderboard(channel, tc, fromu, message):
-    p = inflect.engine()
-    text = "You received *" + str(tc) + " " + p.plural(taco_name, tc) + "* from <@" + fromu + "> in <#" + channel + ">"
-    attachment = "[{\"text\": \"" + message + "\"}]"
+def send_message_leaderboard(channel, cid):
+    leaderboard = dynamo_get_leaderboard(cid)
 
-    send_slack_message(text, channel, attachment)
+    send_slack_message(str(leaderboard), channel)
 
 
 def send_message_not_enough_tacos(user, tried, tr, channel):
@@ -283,6 +306,8 @@ def slack_message(body):
         if body['event']['text'] == p.plural(taco_name):
             my_tacos_avail = dynamo_get_tacos_avail(body['event']['user'])
             send_message_tacos_available(body['event']['user'], my_tacos_avail)
+        if body['event']['text'] == 'leaderboard':
+            send_message_leaderboard(body['event']['user'], get_cid_this_week(body['team_id']))
 
     return
 
