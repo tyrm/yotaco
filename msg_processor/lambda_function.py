@@ -12,7 +12,6 @@ import re
 import requests
 
 print('Loading function')
-dynamo = boto3.client('dynamodb')
 
 debug = os.getenv('DEBUG', 'false')
 taco_name = os.getenv('EMOJI', 'taco')
