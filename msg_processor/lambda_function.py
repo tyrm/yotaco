@@ -20,7 +20,7 @@ bot_user  = os.environ['SLACK_BOT_USER']
 
 print('Loading function', debug, taco_name, timezone, bot_user)
 
-def dynamo_add_taco(ts, index, team, channel, channel_display_name, fromu, from_display_name, tou, to_display_name, message):
+def dynamo_add_taco(ts, index, team, channel, fromu, tou, message):
     dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
 
     # Add Taco Transaction
@@ -32,12 +32,9 @@ def dynamo_add_taco(ts, index, team, channel, channel_display_name, fromu, from_
             'timestamp': decimal.Decimal(ts),
             'cid': get_cid_today(team),
             'channel': channel,
-            'channel_display_name': channel_display_name,
             'team': team,
             'from': fromu,
             'to': tou,
-            'from_display_name': from_display_name,
-            'to_display_name': to_display_name,
             'message': message
         }
     )
@@ -104,7 +101,7 @@ def dynamo_get_recents(team, days=0):
             KeyConditionExpression=Key('cid').eq(cid)
         )
         for record in response.get("Items", []):
-            person_data = by_person.setdefault(record['to_display_name'], {}).setdefault(date, [])
+            person_data = by_person.setdefault(record['to'], {}).setdefault(date, [])
             person_data.append(record)
 
     return by_person
@@ -246,14 +243,11 @@ def get_user_name(user_id):
 
 def process_tacos(tc, tu, tr, body):
     index = 1
-    from_user_display_name = get_user_display_name(body['event']['user'])
-    channel_display_name = get_channel_display_name(body['event']['channel'])
     for user in tu:
         for x in range(tc):
-            user_display_name = get_user_display_name(user)
             dynamo_add_taco(body['event']['event_ts'], index, body['team_id'], 
-                            body['event']['channel'], channel_display_name,
-                            body['event']['user'], from_user_display_name, user, user_display_name,
+                            body['event']['channel'], 
+                            body['event']['user'], user, 
                             body['event']['text'])
             index = index + 1
 
@@ -283,19 +277,15 @@ def send_message_recent(channel, team, users_in_channel=None):
 
     message = "Recent %d days\n\n" % days
     for user, by_day in recents_by_user.iteritems():
-        for day, items in by_day.iteritems():
-            if channel_members is not None and items[0]["to"] not in channel_members:
-                continue
+        if channel_members is not None and not user in channel_members:
+            continue
 
-            message += "@%s received %d:\n" % (user, len(items))
+        for day, items in by_day.iteritems():
+            message += "<@%s> received %d:\n" % (user, len(items))
 
             for item in items:
                 for_string = item["message"]
-                if "to_display_name" in item:
-                    for_string = for_string.replace('<@%s>' % item.get("to"), '@' + item["to_display_name"])
-                if "from_display_name" in item:
-                    for_string = for_string.replace('<@%s>' % item.get("from"), '@' + item["from_display_name"])
-                message += "%s in #%s from @%s for '%s'\n" % (day, item["channel_display_name"], item["from_display_name"], for_string)
+                message += "%s in <#%s> from <@%s> for '%s'\n" % (day, item["channel"], item["from"], for_string)
 
     attachment = "[{\"text\": \"" + message + "\"}]"
     send_slack_message(None, channel, attachment)
