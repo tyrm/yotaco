@@ -11,7 +11,6 @@ import os
 import re
 import requests
 
-print('Loading function')
 
 debug = os.getenv('DEBUG', 'false')
 taco_name = os.getenv('EMOJI', 'taco')
@@ -19,20 +18,24 @@ timezone = os.getenv('TZ_OFFSET', 0)
 bot_token = os.environ['SLACK_BOT_TOKEN']
 bot_user  = os.environ['SLACK_BOT_USER']
 
+print('Loading function', debug, taco_name, timezone, bot_user)
 
-def dynamo_add_taco(ts, index, team, channel, fromu, tou):
+def dynamo_add_taco(ts, index, team, channel, fromu, tou, message):
     dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
 
     # Add Taco Transaction
     transaction_table = dynamodb.Table('taco_transactions')
+    ts_str = "%017.6f" % float(ts)
     transaction_table.put_item(
         Item={
-            'tid': str(ts) + "-" + team + "-" + channel + "-" + str(index),
+            'tid': ts_str + "-" + team + "-" + channel + "-" + str(index),
             'timestamp': decimal.Decimal(ts),
+            'cid': get_cid_today(team),
             'channel': channel,
             'team': team,
             'from': fromu,
-            'to': tou
+            'to': tou,
+            'message': message
         }
     )
 
@@ -84,6 +87,24 @@ def dynamo_add_taco(ts, index, team, channel, fromu, tou):
 
     return
 
+def dynamo_get_recents(team, days=0):
+    dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
+    table = dynamodb.Table('taco_transactions')
+
+    by_person = {}
+
+    for day_back in range(days, -1, -1):
+        cid = get_cid_back(team, day_back)
+        date = cid[0:10]
+        response = table.query(
+            IndexName='cid-index',
+            KeyConditionExpression=Key('cid').eq(cid)
+        )
+        for record in response.get("Items", []):
+            person_data = by_person.setdefault(record['to'], {}).setdefault(date, [])
+            person_data.append(record)
+
+    return by_person
 
 def dynamo_get_leaderboard(cid):
     dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
@@ -160,10 +181,13 @@ def get_cid_this_year(team):
     return midnight.strftime('%Y') + "-" + team
 
 
+def get_cid_back(team, back):
+    midnight = get_local_midnight() - datetime.timedelta(days=back)
+    return midnight.strftime('%Y-%m-%d') + "-" + team
+
 def get_cid_today(team):
     midnight = get_local_midnight()
     return midnight.strftime('%Y-%m-%d') + "-" + team
-
 
 def get_epoch(ts):
     return int(((ts - datetime.datetime(1970, 1, 1)) - datetime.timedelta(hours=int(timezone))).total_seconds())
@@ -182,6 +206,26 @@ def get_team_name():
 
     return team_info['team']['name']
 
+def get_user_display_name(user_id):
+    params = {"token": bot_token, "user": user_id}
+    r = requests.get('https://slack.com/api/users.info', params=params)
+    user_info = r.json()
+
+    return user_info['user']['name']
+
+def get_channel_display_name(channel_id):
+    params = {"token": bot_token, "channel": channel_id}
+    r = requests.get('https://slack.com/api/conversations.info', params=params)
+    channel_info = r.json()
+
+    return channel_info['channel']['name']
+
+def get_channel_members(channel_id):
+    params = {"token": bot_token, "channel": channel_id}
+    r = requests.get('https://slack.com/api/conversations.members', params=params)
+    channel_info = r.json()
+
+    return set(channel_info['members'])
 
 def get_time_to_next_midnight():
     st = datetime.datetime.now() + datetime.timedelta(hours=int(timezone))
@@ -201,8 +245,10 @@ def process_tacos(tc, tu, tr, body):
     index = 1
     for user in tu:
         for x in range(tc):
-            dynamo_add_taco(body['event']['event_ts'], index, body['team_id'], body['event']['channel'],
-                            body['event']['user'], user)
+            dynamo_add_taco(body['event']['event_ts'], index, body['team_id'], 
+                            body['event']['channel'], 
+                            body['event']['user'], user, 
+                            body['event']['text'])
             index = index + 1
 
         send_message_you_got_taco(user, tc, body['event']['user'], body['event']['channel'], body['event']['text'])
@@ -220,6 +266,29 @@ def respond(err, res=None):
         },
     }
 
+
+def send_message_recent(channel, team, users_in_channel=None):
+    days = 7
+    recents_by_user = dynamo_get_recents(team, days)
+
+    channel_members = None
+    if users_in_channel is not None:
+        channel_members = get_channel_members(users_in_channel)
+
+    message = "Recent %d days\n\n" % days
+    for user, by_day in recents_by_user.iteritems():
+        if channel_members is not None and not user in channel_members:
+            continue
+
+        for day, items in by_day.iteritems():
+            message += "<@%s> received %d:\n" % (user, len(items))
+
+            for item in items:
+                for_string = item["message"]
+                message += "%s in <#%s> from <@%s> for '%s'\n" % (day, item["channel"], item["from"], for_string)
+
+    attachment = "[{\"text\": \"" + message + "\"}]"
+    send_slack_message(None, channel, attachment)
 
 def send_message_leaderboard(channel, team, time_range):
     leaderboard = []
@@ -362,14 +431,21 @@ def slack_message(body):
         if body['event']['text'] == p.plural(taco_name):
             my_tacos_avail = dynamo_get_tacos_avail(body['event']['user'])
             send_message_tacos_available(body['event']['user'], my_tacos_avail)
-        elif body['event']['text'] == 'leaderboard' or body['event']['text'] == 'leaderboard weekly':
+        elif body['event']['text'] in ('leaderboard', 'leaderboard weekly'):
             send_message_leaderboard(body['event']['user'], body['team_id'], 'weekly')
-        elif body['event']['text'] == 'leaderboard daily' or body['event']['text'] == 'leaderboard today':
+        elif body['event']['text'] in ('leaderboard daily', 'leaderboard today'):
             send_message_leaderboard(body['event']['user'], body['team_id'], 'daily')
         elif body['event']['text'] == 'leaderboard monthly':
             send_message_leaderboard(body['event']['user'], body['team_id'], 'monthly')
         elif body['event']['text'] == 'leaderboard yearly':
             send_message_leaderboard(body['event']['user'], body['team_id'], 'yearly')
+        elif body['event']['text'].startswith('recent'):
+            args = body['event']['text'].split(' ')
+            if len(args) > 1 and args[1].startswith('<#'):
+                channel_filter = re.match('<#([^\|>]*)', args[1]).group(1)
+            else:
+                channel_filter = None
+            send_message_recent(body['event']['user'], body['team_id'], channel_filter)
 
     return
 
