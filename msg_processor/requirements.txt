@@ -1,4 +1,4 @@
 boto3>=1.0,<=2.0
 git+https://github.com/jazzband/inflect.git@v2.0.1#egg=inflect
 requests>=2.0,<=3.0
-urllib3==1.26.5
+urllib3==1.26.18
